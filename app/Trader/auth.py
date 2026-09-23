@@ -4,7 +4,7 @@ from app.config import get_settings
 
 API_KEY, SECRET_KEY = get_settings().ALPACA_API_KEY, get_settings().ALPACA_SECRET_KEY
 
-def get_data_client():
+def get_data_client_key():
     # Market data
     data_client = StockHistoricalDataClient(
         API_KEY,
@@ -13,7 +13,7 @@ def get_data_client():
 
     return data_client
 
-def get_trading_client():
+def get_trading_client_key():
     
     # Paper trading account
     trading_client = TradingClient(
