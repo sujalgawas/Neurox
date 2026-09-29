@@ -38,15 +38,7 @@ def execute_order(
     }
 
 
-def dummy_predict_signal(history: Any, observation: dict[str, Any]) -> float:
-    """Placeholder predictor that returns the latest observed price."""
-    current_price = float(observation.get("latest_price", 0))
-    if not math.isfinite(current_price) or current_price <= 0:
-        raise ValueError("invalid_current_price")
-    return 1 #returning 1 to trigger buy
-
-
-def run_trading_pipeline(
+def run_trading_pipeline_jepa(
     history: Any,
     observation: dict[str, Any],
     predict_signal: Callable[[Any, dict[str, Any]], float],

@@ -10,11 +10,12 @@ import numpy as np
 def get_market_observation(
                             symbol: str = "AAPL", 
                             lookback_minutes: int = 60,
-                            data_client: StockHistoricalDataClient = None
+                            data_client: StockHistoricalDataClient = None,
+                            end: datetime = None,
                         ) -> dict:
     
-    end = datetime.now(timezone.utc)
-    start = end - timedelta(minutes=lookback_minutes)
+    end = end or datetime.now(timezone.utc)
+    start = end - timedelta(minutes=lookback_minutes + 2)
 
     request = StockBarsRequest(
         symbol_or_symbols=symbol.upper(),
