@@ -15,11 +15,13 @@ from app.Trader.auth import get_data_client_key, get_trading_client_key
 from app.Trader.trading import run_trading_pipeline_jepa
 from app.services.JEPA import JEPAInference, download_checkpoint
 from app.services.JEV import JEVInference
+from app.combined.api import router as combined_router
 
 data_client = get_data_client_key()
 trading_client = get_trading_client_key()
 
 app = FastAPI()
+app.include_router(combined_router)
 
 
 class TradingPipelineRequest(BaseModel):
@@ -38,6 +40,7 @@ def get_jepa_inference() -> JEPAInference:
             repo_id=settings.jepa_hf_repo,
             filename=settings.jepa_hf_filename,
             token=settings.huggingface_key,
+            revision=settings.jepa_hf_revision,
         )
     return JEPAInference(checkpoint_path)
 
@@ -128,14 +131,24 @@ def jepa_observation(request: TradingPipelineRequest):
 @app.post("/run_trading_pipeline_jepa")
 def run_pipeline(request: TradingPipelineRequest):
     results = []
-
-    for iteration in range(30):
+    iterations = 120
+    for iteration in range(iterations):
         try:
-            observation = get_market_observation(
-                symbol=request.symbol,
-                lookback_minutes=request.lookback_minutes,
-                data_client=data_client,
-            )
+            try:
+                observation = get_market_observation(
+                    symbol=request.symbol,
+                    lookback_minutes=request.lookback_minutes,
+                    data_client=data_client,
+                )
+            except ValueError as error:
+                if str(error) != "Insufficient market data returned from provider.":
+                    raise
+                # Outside market hours, use the latest available prior weekday.
+                observation = get_dummy_jev_market_observation(
+                    symbol=request.symbol,
+                    lookback_minutes=request.lookback_minutes,
+                    data_client=data_client,
+                )
             result = run_trading_pipeline_jepa(
                 history=request.history,
                 observation=observation,
@@ -149,8 +162,8 @@ def run_pipeline(request: TradingPipelineRequest):
 
         results.append({"iteration": iteration + 1, "result": result})
 
-        if iteration < 9:
-            time.sleep(50)
+        if iteration < iterations - 1:
+            time.sleep(60)
 
     return {"runs": results}
 

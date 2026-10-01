@@ -258,9 +258,10 @@ class JEPAInference:
 
 
 def download_checkpoint(
-	repo_id: str = "sujalgawas/jepa-trading-model-direction",
-	filename: str = "best.pt",
+	repo_id: str = "sujalgawas/jepa-trading-direction-Big",
+	filename: str = "model.pt",
 	token: str | None = None,
+	revision: str | None = None,
 ) -> str:
 	"""Download a Hugging Face checkpoint into the Hub cache and return its path."""
 	try:
@@ -269,6 +270,7 @@ def download_checkpoint(
 			filename=filename,
 			repo_type="model",
 			token=token,
+			revision=revision,
 		)
 	except Exception as error:
 		raise FileNotFoundError(

@@ -38,6 +38,41 @@ def execute_order(
     }
 
 
+def _available_sell_quantity(
+    trading_client: Any,
+    symbol: str,
+    position_quantity: float,
+) -> float | None:
+    """Return position quantity that is not reserved by open sell orders."""
+    get_orders = getattr(trading_client, "get_orders", None)
+    if get_orders is None:
+        return position_quantity
+
+    try:
+        orders = get_orders()
+    except Exception:
+        return None
+
+    held_quantity = 0.0
+    for order in orders:
+        order_symbol = str(getattr(order, "symbol", "")).upper()
+        order_side = str(getattr(order, "side", "")).lower().split(".")[-1]
+        if order_symbol != symbol or order_side != "sell":
+            continue
+
+        status = str(getattr(order, "status", "")).lower().split(".")[-1]
+        if status in {"filled", "canceled", "expired", "rejected"}:
+            continue
+        try:
+            order_quantity = float(getattr(order, "qty", 0))
+            filled_quantity = float(getattr(order, "filled_qty", 0) or 0)
+        except (TypeError, ValueError):
+            return None
+        held_quantity += max(order_quantity - filled_quantity, 0.0)
+
+    return max(position_quantity - held_quantity, 0.0)
+
+
 def run_trading_pipeline_jepa(
     history: Any,
     observation: dict[str, Any],
@@ -188,6 +223,23 @@ def run_trading_pipeline_jepa(
 
         if sell_quantity <= 0:
             return {"action": "hold", "symbol": symbol, "reason": "no_sellable_quantity"}
+
+        available_quantity = _available_sell_quantity(
+            trading_client, symbol, sell_quantity
+        )
+        if available_quantity is None:
+            return {
+                "action": "hold",
+                "symbol": symbol,
+                "reason": "open_order_check_failed",
+            }
+        if available_quantity <= 0:
+            return {
+                "action": "hold",
+                "symbol": symbol,
+                "reason": "sell_order_pending",
+            }
+        sell_quantity = min(sell_quantity, available_quantity)
 
         # Close position when model predicts down trend
         result = execute_order(trading_client, symbol, "sell", sell_quantity)
